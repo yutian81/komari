@@ -1,4 +1,4 @@
-package logOperation
+package auditlog
 
 import (
 	"log"
@@ -19,6 +19,10 @@ func Log(ip, uuid, message, msgType string) {
 		Time:    models.FromTime(now),
 	}
 	db.Create(logEntry)
+}
+
+func EventLog(eventType, message string) {
+	Log("", "", message, eventType)
 }
 
 // Delete logs older than 30 days

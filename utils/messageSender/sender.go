@@ -1,8 +1,8 @@
 package messageSender
 
 import (
+	"github.com/komari-monitor/komari/database/auditlog"
 	"github.com/komari-monitor/komari/database/config"
-	"github.com/komari-monitor/komari/database/logOperation"
 )
 
 var CurrentProvider MessageSender
@@ -36,13 +36,20 @@ type MessageSender interface {
 
 func SendTextMessage(message string, title string) error {
 	var err error
+	cfg, err := config.Get()
+	if err != nil {
+		return err
+	}
+	if !cfg.NotificationEnabled {
+		return nil
+	}
 	for i := 0; i < 3; i++ {
 		err = CurrentProvider.SendTextMessage(message, title)
 		if err == nil {
-			logOperation.Log("", "", "Message sent: "+title, "info")
+			auditlog.Log("", "", "Message sent: "+title, "info")
 			return nil
 		}
 	}
-	logOperation.Log("", "", "Failed to send message after 3 attempts: "+err.Error()+","+title, "error")
+	auditlog.Log("", "", "Failed to send message after 3 attempts: "+err.Error()+","+title, "error")
 	return err
 }
