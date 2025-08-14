@@ -1,0 +1,63 @@
+name: Publish to Docker Hub
+
+on:
+  workflow_dispatch:  # 手动触发
+  #schedule:
+  #  - cron: '0 0 * * 1'  # 每周一UTC午夜自动运行（每周1次）
+
+env:
+  GHCR_IMAGE: ghcr.io/komari-monitor/komari:latest
+  DOCKERHUB_REPO: komari-monitor
+
+jobs:
+  publish-to-dockerhub:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Pull image from GHCR
+        run: |
+          docker pull ${{ env.GHCR_IMAGE }}
+          docker image inspect ${{ env.GHCR_IMAGE }}
+
+      - name: Retag and push to Docker Hub
+        run: |
+          # 获取当前日期作为标签
+          DATE_TAG=$(date +"%Y%m%d")
+          
+          # 从secrets获取Docker Hub用户名和镜像名
+          DOCKERHUB_USERNAME="${{ secrets.DOCKERHUB_USERNAME }}"
+          DOCKERHUB_IMAGE="$DOCKERHUB_USERNAME/${{ env.DOCKERHUB_REPO }}"
+          
+          # 重新标记镜像
+          docker tag ${{ env.GHCR_IMAGE }} $DOCKERHUB_IMAGE:latest
+          docker tag ${{ env.GHCR_IMAGE }} $DOCKERHUB_IMAGE:$DATE_TAG
+          
+          # 推送到 Docker Hub
+          docker push $DOCKERHUB_IMAGE:latest
+          docker push $DOCKERHUB_IMAGE:$DATE_TAG
+
+      - name: Create and push multi-arch manifest
+        run: |
+          # 从secrets获取Docker Hub用户名
+          DOCKERHUB_USERNAME="${{ secrets.DOCKERHUB_USERNAME }}"
+          DOCKERHUB_IMAGE="$DOCKERHUB_USERNAME/${{ env.DOCKERHUB_REPO }}"
+          
+          # 创建多架构 manifest
+          docker manifest create $DOCKERHUB_IMAGE:latest \
+            $DOCKERHUB_IMAGE:latest --amend \
+            $DOCKERHUB_IMAGE:latest --amend
+          
+          # 推送到 Docker Hub
+          docker manifest push $DOCKERHUB_IMAGE:latest
